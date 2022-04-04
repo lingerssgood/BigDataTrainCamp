@@ -1,0 +1,42 @@
+建表语句：
+create external table t_user(userid int,sex string,age int ,occupation int,zipcode int)
+row format serde 'org.apache.hadoop.hive.contrib.serde2.MultiDelimitSerDe'
+with serdeproperties("field.delim"="::") location 'data/hive/users/';
+
+
+create external table t_movie(movieid int, moviename string, movietype string
+) ROW FORMAT SERDE 'org.apache.hadoop.hive.contrib.serde2.MultiDelimitSerDe' WITH SERDEPROPERTIES ("field.delim" = "::") location '/data/hive/movies/';
+load data inpath '/data/hive/movies/movies.dat' into table t_movie;
+
+create external table t_rating(userid int, movieid int, rate int, times bigint
+) ROW FORMAT SERDE 'org.apache.hadoop.hive.contrib.serde2.MultiDelimitSerDe' WITH SERDEPROPERTIES ("field.delim" = "::") location '/data/hive/ratings/';
+load data inpath '/data/hive/ratings/ratings.dat' into table t_rating;
+题目一：展示电影 ID 为 2116 这部电影各年龄段的平均影评分
+SELECT m.age age, avg(n.rate) avgrate FROM t_user m
+JOIN t_rating n ON m.userid = n.userid WHERE n.movieid = 2116
+GROUP BY m.age;
+题目二：找出男性评分最高且评分次数超过 50 次的 10 部电影，展示电影名，平均 影评分和评分次数。
+select u.sex,m.moviename,avg(rate),sum(times) from t_rating r join t_user u on r.userid  =u.userid
+join t_moive m on r.movieid =m.movieid
+where u.sex='F'
+group by u.sex,m.moviename
+order by rating desc
+having sum(times)>50
+limit 10;
+题目三：找出影评次数最多的女士所给出最高分的 10 部电影的平均影评分，展示 电影名和平均影评分。
+
+
+select m.moviename as name,avg(r.rate)as avgrate from t_rating r
+join t_movie m on r.movieid=m.movieid
+join(select w.movieid,w.rate from t_rating w
+join(select u.userid,count(*)as num from t_user u
+join t_rating r on u.userid=r.userid
+where u.sex='F'
+group by u.userid
+order by num desc
+limit 1)u
+on w.userid=u.userid
+order by w.rate desc,w.movieid
+limit 10)mm
+on r.movieid=mm.movieid
+group by m.moviename
